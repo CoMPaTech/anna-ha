@@ -11,7 +11,7 @@ from homeassistant.components.climate.const import (
     CURRENT_HVAC_HEAT,
     CURRENT_HVAC_IDLE,
     HVAC_MODE_AUTO,
-    HVAC_MODE_OFF,
+    HVAC_MODE_HEAT,
     SUPPORT_PRESET_MODE,
     SUPPORT_TARGET_TEMPERATURE,
 )
@@ -44,7 +44,7 @@ DEFAULT_MIN_TEMP = 4
 DEFAULT_MAX_TEMP = 30
 
 # HVAC modes
-ATTR_HVAC_MODES = [HVAC_MODE_AUTO, HVAC_MODE_OFF]
+ATTR_HVAC_MODES = [HVAC_MODE_AUTO, HVAC_MODE_HEAT]
 
 # Read platform configuration
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
@@ -95,6 +95,7 @@ class ThermostatDevice(ClimateDevice):
         self._active_schema = None
         self._preset_mode = None
         self._hvac_modes = ATTR_HVAC_MODES
+        self._schedule_override = False
 
     @property
     def hvac_action(self):
@@ -142,18 +143,24 @@ class ThermostatDevice(ClimateDevice):
     def hvac_mode(self):
         """Return current active hvac state."""
         if self._api.get_schema_state(self._domain_objects):
+            self._schedule_override = False
             return HVAC_MODE_AUTO
-        return HVAC_MODE_OFF
+        self._schedule_override = True
+        return HVAC_MODE_HEAT
 
     @property
     def preset_mode(self):
         """Return the active preset mode."""
-        return self._api.get_current_preset(self._domain_objects)
+        preset = self._api.get_current_preset(self._domain_objects)
+        if self.hvac_mode == HVAC_MODE_AUTO:
+          return "{} @ {}".format(preset,self._active_schema)
+        return preset
 
     @property
     def preset_modes(self):
         """Return the available preset modes list without values."""
         presets = list(self._api.get_presets(self._domain_objects))
+        presets.append(None)
         return presets
 
     @property
